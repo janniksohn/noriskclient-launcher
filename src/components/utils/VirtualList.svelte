@@ -20,16 +20,24 @@
 	let top = 0;
 	let bottom = 0;
 	let average_height;
+	let content_width = 0; 
 	$: visible = items.slice(start, end).map((data, i) => {
 		return { index: i + start, data };
 	});
 	// whenever `items` changes, invalidate the current heightmap
 	$: if (mounted) refresh(items, viewport_height, itemHeight);
 	async function refresh(items, viewport_height, itemHeight) {
+		const isStartOverflow = items.length < start
+		
+		if (isStartOverflow) {
+			await scrollToIndex(items.length - 1, {behavior: 'auto'})
+		}
 		const { scrollTop } = viewport;
 		await tick(); // wait until the DOM is up to date
 		let content_height = top - scrollTop;
 		let i = start;
+		let row_width;
+		let max_row_width = 0;
 		while (content_height < viewport_height && i < items.length) {
 			let row = rows[i - start];
 			if (!row) {
@@ -37,7 +45,9 @@
 				await tick(); // render the newly visible row
 				row = rows[i - start];
 			}
-			const row_height = height_map[i] = itemHeight || row.offsetHeight;
+			const row_height = height_map[i] = itemHeight || row.offsetHeight;			
+			row_width = row.scrollWidth;
+			if (row_width > max_row_width) max_row_width = row_width;
 			content_height += row_height;
 			i += 1;
 		}
@@ -47,8 +57,11 @@
 		bottom = remaining * average_height;
 		height_map.length = items.length;
 
+		content_width = Math.max(max_row_width, viewport.clientWidth);
+
         if (autoScroll) {
             viewport.scrollTop = viewport.scrollHeight;
+			viewport.scrollLeft = viewport.scrollWidth - row_width;
         }
 	}
 	async function handle_scroll() {
@@ -97,6 +110,21 @@
 		// rows would occupy we may need to add some
 		// more. maybe we can just call handle_scroll again?
 	}
+	export async function scrollToIndex (index, opts) {
+		const {scrollTop} = viewport;
+		const itemsDelta = index - start;
+		const _itemHeight = itemHeight || average_height;
+		const distance = itemsDelta * _itemHeight;
+		opts = {
+			left: 0,
+			top: scrollTop + distance,
+			behavior: 'smooth',
+			...opts
+		};
+		viewport.scrollTo(opts);
+	}
+	
+
 	// trigger initial refresh
 	onMount(() => {
 		rows = contents.getElementsByTagName('svelte-virtual-list-row');
@@ -108,7 +136,7 @@
 	svelte-virtual-list-viewport {
 		position: relative;
 		overflow-y: auto;
-		overflow-x: hidden;
+		overflow-x: auto;
 		-webkit-overflow-scrolling:touch;
 		display: block;
 	}
@@ -128,7 +156,7 @@
 >
 	<svelte-virtual-list-contents
 		bind:this={contents}
-		style="padding-top: {top}px; padding-bottom: {bottom}px;"
+		style="padding-top: {top}px; padding-bottom: {bottom}px; width: {content_width}px;"
 	>
 		{#each visible as row (row.index)}
 			<svelte-virtual-list-row>

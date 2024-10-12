@@ -64,7 +64,7 @@
       filteredLogs = logs.filter(log => {
         const logMatch = log.match(/\[(.*?)\]/g);
         if (logMatch && logMatch.length > 1) {
-          logLevel = logMatch[1].split('/')[1]?.replace(']', '');
+          logLevel = logMatch[1].split('/')[1].replace(']', '');
         }
         if (isAnyLevelSelected) {
           return logLevels[logLevel.toLowerCase()] && log.toLowerCase().includes(searchQuery.toLowerCase());
@@ -79,6 +79,7 @@
     } else {
       autoScroll = true;
     }
+    
     Object.keys(logLevels).forEach(level => {
       logCounts[level] = $minecraftLogs.filter(log => {
         const logMatch = log.match(/\[(.*?)\]/g);
